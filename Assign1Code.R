@@ -1,4 +1,5 @@
 library(fpp)
+# data from https://fred.stlouisfed.org/series/CIVPART -> to use API
 
 finalproj = read.csv("C:/schulich/Econ R/Final project/LbrForce.csv")
 print(finalproj)
