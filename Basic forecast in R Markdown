@@ -8,7 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-1. This question refers to the data set that you are using for your project. For your data set determine the best simple forecasting method (average, naïve, seasonal naïve, linear trend). Use 80% of the data for training and 20% of the data for testing. Using the best model, forecast your data set for 6 periods into the future. 10 points
+1. This question refers to the data set that you are using for your project. For your data set determine the best simple forecasting method (average, naÃ¯ve, seasonal naÃ¯ve, linear trend). Use 80% of the data for training and 20% of the data for testing. Using the best model, forecast your data set for 6 periods into the future. 10 points
 
 Import libraries and data:
 ```{r message=FALSE}
