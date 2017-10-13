@@ -1,6 +1,8 @@
 library(fpp)
 library(knitr)
 
+#dataset is https://fred.stlouisfed.org/series/CIVPART to add API
+
 finalproject = read.csv("C:/schulich/Econ R/Final project/LbrForce.csv")
 head(finalproject)
 lbrts = ts(finalproject, start = 1948, end = c(2017,8), frequency = 12)
