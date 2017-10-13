@@ -1,0 +1,87 @@
+---
+title: "Assignment 2"
+author: "Krista Bennatti-Roberts"
+date: "October 5, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+1. This question refers to the data set that you are using for your project. For your data set determine the best simple forecasting method (average, naïve, seasonal naïve, linear trend). Use 80% of the data for training and 20% of the data for testing. Using the best model, forecast your data set for 6 periods into the future. 10 points
+
+Import libraries and data:
+```{r message=FALSE}
+library(fpp)
+library(knitr)
+
+finalproject = read.csv("C:/schulich/Econ R/Final project/LbrForce.csv")
+```
+
+View first few lines of dataset:
+```{r}
+head(finalproject)
+```
+
+Set up training and testing sets:
+```{r}
+lbrts = ts(finalproject, start = 1948, end = c(2017,8), frequency = 12)
+trainlbr = window(lbrts[,2], start = c(1948, 1), end = c(2003, 12))
+traindt = window(lbrts[,1], start = c(1948, 1), end = c(2003, 12))
+testlbr = window(lbrts[,2], start = c(2004, 1), end =c(2017,8))
+testldt = window(lbrts[,1], start = c(2004, 1), end =c(2017,8))
+```
+
+Train the models:
+```{r}
+h = length(testlbr)
+
+fitmean = meanf(trainlbr, h=h)
+fitnaive = naive(trainlbr, h=h)
+fitseason = snaive(trainlbr, h=h)
+fitlm = tslm(trainlbr ~ trend)
+fcstlm = forecast(fitlm, h=h)
+```
+
+
+Test the accuracy of the models:
+```{r}
+#test data
+
+accm = accuracy(fitmean, testlbr)
+accn = accuracy(fitnaive, testlbr)
+accs = accuracy(fitseason, testlbr)
+acclm = accuracy(fcstlm, testlbr)
+
+#put accuracy into a table
+
+acctable = rbind(accm, accn, accs, acclm)
+row.names(acctable) = c('Mean training','Mean test', 'Naive training', 'Naive test', 
+                        'S. Naive training', 'S. Naive test', 'Linear training', 'Linear test')
+print(acctable)
+
+```
+
+Conclusion on best model: As shown above, the best (most accurate) model is the naive model according to the MASE and RMSE accuracy measures.
+
+Here is a plot of the forecasts:
+```{r}
+#make a plot
+plot(fitmean, PI= FALSE #removes confidence interval#
+     , main = "U.S. Labour Force Participation Rate Forecasts", xlab = 'Year', ylab = "%")
+lines(fitnaive$mean, col = 'Green')
+lines(fitseason$mean, col = 'Pink')
+lines(fcstlm$mean, col = "Red")
+lines(testlbr)
+legend('topleft', lty =1, col =c("Blue",'Green','Pink', 'Red'), 
+       legend = c("Mean", "Naive", "Seasonal Naive", "Linear"))
+
+```
+
+Forecast 6 periods into the future and include confidence intervals:
+```{r}
+# forecast 6 periods into the future
+future = naive(lbrts[,2], h=6)
+print(future)
+```
+
