@@ -1,0 +1,304 @@
+---
+title: "Forecasting the U.S. Labour Force Participation Rate"
+author: "Krista Bennatti-Roberts"
+date: "December 6, 2017"
+output: html_document
+---
+
+## 1 Introduction 
+
+This paper describes the process of developing and choosing a model to  forecast U.S. civilian labour force participation rates, hereafter referred to as "participation rates", over a six-month horizon. A variety of time-series forecasting models were fitted and assessed. Models were compared based on the root-mean square error (RMSE) measure. 
+
+
+The participation rates data is a monthly, non-seasonally adjusted data set from the U.S. Bureau of Labor Statistics and was accessed through the Federal Reserve Bank of St. Louis (FRED) (1). The U.S. Bureau of Labor Statistics defines labor force participation rate as "the percentage of the population either employed or actively seeking work" (2). Unemployed individuals are considered to be participating in the labour force while they are actively looking for work. Military personnel are excluded from the data set.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The participation rates data under analysis ranges from year 1960 through June, 2017. Eighty percent of the data was assigned to a training data set (1960 through 2005) and the remaining 20 percent was assigned to a testing data set. 
+
+```{r warning=FALSE, message=FALSE}
+#libraries:
+library(knitr)
+library(fpp)
+library(forecastHybrid)
+library(vars)
+#import csv with participation rates
+finalproj = read.csv("C:/Users/K/Dropbox/Econ Forecasting/Econ R/Final project/lbrforce.csv")
+#this is a time series
+lbrTs = ts(finalproj, start = 1960, end = c(2017,6), frequency = 12)
+#separate training and testing
+train = window(lbrTs, start = c(1960, 1), end = c(2005, 12))
+test = window(lbrTs, start = c(2006, 1), end =c(2017,6))
+#assign labels to variable columns
+trainLbr = train[,2]
+testLbr = test[,2]
+#define length of testing dataset
+h = length(testLbr)
+```
+
+```{r}
+title1 = "U.S. Labour Force Participation Rate"
+plot(lbrTs[,2], main = title1, xlab = "Years (Monthly)", ylab = "%", col = "blue")
+```
+
+The plot of the participation rates shows that rates increased steadily from around 1980 through year 2000 and have been on the decline from around 2008. The data shows strong seasonality and is clearly non-stationary. 
+
+```{r}
+par(mfrow = c(1,2))
+monthplot(lbrTs[,2], main = 'Participation Rate Month Plot', xlab = "Month", ylab = "%", col = "blue")
+seasonplot(lbrTs[,2], main = 'Participation Rate Season Plot', xlab = "Month", ylab = "Year", col = "blue")
+
+```
+
+Labour force participation rises during the summer, peaking in June and July and dipping over the winter. This seasonal pattern is consistent over time as shown in the season plot. This pattern is consistent with expectations as seasonal jobs tend to be more prolific in the summer. 
+
+## 2 Model Fit Assessment (excluding Vector Autoregression)
+
+Thirteen different time-series forecasting models were fit to the training data. The accuracy of the fit was assessed against the test data and ranked according to RMSE. The thirteen different models that were assessed are detailed in the accuracy chart below. The details of all of these models will not be described here in the interest of brevity.
+
+
+```{r}
+#average
+fitMean = meanf(trainLbr, h=h)
+#naive
+fitnaive = naive(trainLbr, h=h)
+#seasonal naive
+fitsnaive = snaive(trainLbr, h=h)
+#linear trend
+tslmlbr = tslm(trainLbr ~ trend)
+fittslm = forecast(tslmlbr, h=h)
+```
+```{r}
+#exponential
+fitses = ses(trainLbr, h=h)
+#holt-winter's multiplicative
+fithw_m = hw(trainLbr, seasonal="multiplicative", h=h)
+#holt-winter's damped
+fithw_m_d = hw(trainLbr, seasonal="multiplicative", damped = TRUE, h=h)
+#error trend seasonl (ETS)
+etslbr = ets(trainLbr, model = "ZZZ")
+fitets = forecast(etslbr, h=h)
+#ARIMA
+arima_lbr= auto.arima(trainLbr)
+fitarima = forecast(arima_lbr, h=h)
+#ANN
+annlbr = ets(trainLbr, model = "ANN")
+fitann = forecast(annlbr, h=h)
+#neural net
+netlbr = nnetar(trainLbr)
+fitnet = forecast(netlbr, h=h)
+#tbats (time series, box-cox, ARMA, trend, seasonal)
+tbatslbr = tbats(trainLbr)
+fittbats = forecast(tbatslbr, h=h)
+```
+```{r message= FALSE}
+#hybrid model - combines TBATs and neural networks
+hmodlbr = hybridModel(trainLbr, models = "nt")
+fithmod = forecast(hmodlbr, h=h)
+```
+```{r}
+#determine accuracy of all models
+amean = accuracy(fitMean, testLbr)
+anaive= accuracy(fitnaive, testLbr)
+asnaive= accuracy(fitsnaive, testLbr)
+atslm= accuracy(fittslm, testLbr)
+ases= accuracy(fitses, testLbr)
+ahwm= accuracy(fithw_m, testLbr)
+ahwmd= accuracy(fithw_m_d, testLbr)
+aets= accuracy(fitets, testLbr)
+aarima = accuracy(fitarima, testLbr)
+aann = accuracy(fitann, testLbr)
+anet = accuracy(fitnet, testLbr)
+atbats = accuracy(fittbats, testLbr)
+ahmod = accuracy(fithmod, testLbr)
+```
+```{r}
+#Combine accuracy into table and sort by RMSE:
+accTable = rbind(amean, anaive, asnaive, atslm, ases, ahwm, ahwmd, aets, aarima, aann, anet, atbats, ahmod)
+row.names(accTable)= c("Mean Train", "Mean Test","Naive Train", "Naive Test", "Seasonal Naive Train", "Seasonal Naive Test", "Linear Train", "Linear Test", "SES Train", "SES Test","HW Mult. Train", "HW Mult. Test", "HW Damped Train", "HW Damped Test", "ETS Train", "ETS Test", "ARIMA Train", "ARIMA Test", "ANN Train", "ANN Test", "Neural Net Train", "Neural Net Test", "TBATS Train", "TBATS Test", "Hybrid Train", "Hybrid Test")
+#order by MASE
+accFrame = as.data.frame(accTable)
+print(accFrame[order(accFrame$RMSE),])
+```
+
+Of the models assessed, the best performing, based on RMSE, is the "Hybrid" model which combined the neural network time series model with the TBATS model with equal weightings. It's performance is closely followed by the Holt-Winter's multiplicative damped model and the neural network model.
+
+## 3 Vector Auto-Regression Model Assessment
+
+In addition to the models assessed above, the Vector Autoregression Regression (VAR) forecasting model was asessed and compared to the previously assessed models. The objective of fitting a VAR model was to assess whether the addition of explanatory variables could increase forecasting accuracy.
+
+```{r}
+# import data
+lbrDataPlus <- read.csv("C:/Users/K/Dropbox/Econ Forecasting/Econ Final Project/relevant data/newdata.csv")
+#this is a time series
+lbrTsV = ts(lbrDataPlus, start = c(1960,1), end = c(2017,8), frequency = 12)
+```
+
+## 3.1 Selecting Explanatory Variables
+
+The explanatory variables chosen for inclusion in the VAR model were as follows: a) working age (15-64) U.S.citizens as a percentage of the total population ("AgePercPop""), b) U.S. civilian unemployment ("Unempl""), c) producer price index for fuel and fuel related products ("PPIFuel"). All variables were obtained from the Federal Reserve Bank of St. Louis (3,4,5). These variables were chosen based on the drivers that are believed to have the largest influence on participation rates or proxy measures where these drivers were not available. 
+
+Recent changes in labour force participation have likely been driven primarily by three variables: the relative number of working age people in the population (represented by "AgePercPop"), the level of educational attainment in the population (if individuals spend more time in school, labour force participation decreases), and finally, the state of the economy (represented by "Unempl" and "PPIFuel". The state of the economy impacts labour force participation because if there are few good jobs, people who are less employable or less motivated to work will eventually stop looking for work and therefore stop being considered as part of the numerator. Educational attainment and domestic product, the latter being a proxy measure of the state of the economy are reported annually and quarterly, respectively and therefore could not be integrated into this VAR model.  Unemployment was used as a proxy for economic state in lieu of GDP. The PPI of fuels and related products was also included based on the fact that this data set shows notable spikes during recession periods. 
+
+In order to prepare the data for VAR modelling, the data was passed through a log function and the variables were ordered with higher-level, macro variables first, followed by lower-level variables.  The variables were ordered as follows: a) working age (15-64) U.S.citizens as a percentage of the total population ("AgePercPop""), b) U.S. civilian unemployment , c) producer price index for fuel and fuel related products , d) participation rates. 
+
+```{r}
+lbrVarTs = log(lbrTsV[,c(3,5,4,2)])
+trainVar = window(lbrVarTs, start = c(1960, 1), end = c(2005, 12))
+#plot
+plot(lbrVarTs, main= 'U.S. Lbr Force Particip. and Other Variables')
+```
+
+Of the four variables shown above, the working age as a proportion of the population variable visually appears to best follow the cycle of participation rates.
+
+```{r}
+#correlation matrix
+cor(lbrVarTs)
+```
+
+This observation is supported by the correlation matrix which shows an 86 percent correlation between the working age as a proportion of the population and participation rates. The PPI of fuel and related products is 68 percent correlated while unemployment shows a weak, positive correlation of about 16 percent. The fact that the correlation is positive is somewhat surprising.
+
+## 3.2 Developing the VAR model
+
+In order to determine the appropriate number of lags to use in the VAR model, a "VARselect" function was applied in R. 
+
+```{r}
+varSel = VARselect(trainVar, lag.max = 10, season = 12)
+varSel$selection
+```
+
+All of three possible lag choices for the four information criterion shown above were tried in the model (not shown here) and the Schwartz Criterion was selected for use as it demonstrated the best performance when assessed against the testing data. The Schwartz criterion is less likely to overfit and in this case that was beneficial. 
+
+
+```{r}
+#train the VAR model using the selected number of lags
+varTrain.1 = VAR(trainVar, p=varSel$selection[3], season =12) #
+```
+
+In general, a good fitting VAR model should have roots of the characteristics polynomial that are less than one as well as random residuals. 
+
+```{r}
+#check the roots
+roots(varTrain.1)
+```
+
+In this case, all roots are below one.
+
+The autocorrelation and partial-autocorrelation plots (see Appendix II) show evidence that the residuals of unemployment versus the participation rates are autocorrelated i.e. not random. The other variables do not show significant autocorrelation for positive lags. Note that plots of variables against themselves can be ignored. The autocorrelation of the residuals for unemployment indicates that the model should be tried with unemployment removed. This was done, however, because predictive performance was ultimately inferior, this exercise is not shown here. 
+
+Granger-causality of the three explanatory variables was assessed with labour force participation as the response variable. 
+
+```{r}
+#Test Granger-Causality
+causality(varTrain.1, cause= c("AgePercPop", "PPIFuel", "Unempl"))
+```
+
+There is evidence that the three explanatory variables do Granger-cause labour force participation rates at a 95 percent confidence level. There is also evidence of instantaneous causality i.e. causality without a lag at the same confidence level. 
+
+The impulse response factor plots (see Appendix III) show that shocks to the three explanatory variables do not have a significant impact on the labour force participation rates over 36 lags
+
+Factor error variance decomposition (see Appendix IV) demonstrates that variance in labour force participation rates is mostly explained by itself. The proportion explained by the other three variables increases slowly over time. By lag 36 labour force participation accounts for about 79 percent of its own variation versus 93 percent at lag 1. Unemployment accounts for a variable amount of variation that decreases in lags one through 13, and increases thereafter. The amount of variation explained by the other two explanatory variables increases steadily but by very small increments over time achieving only about 5 percent and 6 percent, respectively by lag 36.
+
+## 3.3 Assessing the VAR Model
+
+The VAR model fitted on training data was used as the basis to forecast 138 months forward and assessed against the testing data set. 
+
+```{r}
+varForecast = predict(varTrain.1, n.ahead = h)
+#remove log from forecast
+varFit = exp(varForecast$fcst$LbrForce)
+varFit = data.frame(varFit)
+#accuracy
+avar = accuracy(varFit$fcst, testLbr)
+avar
+```
+
+The VAR model has a RMSE of about 0.84, performing relatively poorly when compared to other models. This VAR model only performs marginally better than the linear trend model. 
+
+## 4 Choosing a Final Model and Creating a Forecast
+
+The best performing model remained the hybrid model based on the RMSE metric. This model combined the neural network and TBATs models with equal weightings.
+
+The hybrid model was therefore used to forecast six periods into the future, the forecasting horizon. The resulting forecast is shown below:
+
+```{r message=FALSE}
+hmodFuture = hybridModel(lbrTs[,2], models = 'nt')
+```
+```{r}
+fitHmodFuture = forecast(hmodFuture, h=6)
+summary(fitHmodFuture)
+```
+
+Visualizations of the hybrid forecast and other forecasts can be found in Appendix I.
+
+## 5 Discussion and Conclusion 
+
+Overall, although a combination of complex models (neural networks and TBATS) ultimately achieved the best performance, some simplistic univariate models performed remarkably well. The Holt-Winter's multiplicative damped model performed almost as well as the hybrid model. Models with a strong trend component did not perform well as they failed to account for the downward turn of the cyclical component after year 2000.  The Holt-Winter's multiplicative damped model selected a beta value of close to zero (close to no trend component) which was likely one reason for it's success and the damping parameter (phi) succeeded in preventing overfitting. The naive model also performed fairly well, matching the performance of Seasonal Exponential Smoothing (SES) at an RMSE of about 0.59 despite its simplicity.
+
+The vector autoregression model performed poorly despite the expectation that external variables would help explain the cyclical component of the data set. One may assume that the influences of external variables on participation rates are more complex than the model allowed. Further, the explanatory variables used to compose the data set were not ideal as more appropriate variables were not available at a monthly frequency. 
+
+Overall, the best performance was acheived using a combined model that leveraged both the neural network and TBATS modelling methods. 
+
+### Bibliography:
+
+(1) U.S. Bureau of Labor Statistics, Civilian Labor Force Participation Rate [LNU01300000], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/LNU01300000, December 6, 2017.
+
+(2) "Labor Force Statistics from the Current Population Survey: How the Government Measures Unemployment", United States Department of Labor, Bureau of Labor Statistics, retrieved from: https://www.bls.gov/cps/cps_htgm.htm#definitions, December 6, 2017. 
+
+(3) Organization for Economic Co-operation and Development, Working Age Population: Aged 15-64: All Persons for the United States [LFWA64TTUSM647N], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/LFWA64TTUSM647N, December 3, 2017. 
+
+(4) U.S. Bureau of Labor Statistics, Civilian Unemployment Rate [UNRATENSA], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/UNRATENSA, December 3, 2017. 
+
+(5) U.S. Bureau of Labor Statistics, Producer Price Index by Commodity for Fuels and Related Products and Power [WPU0574], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/WPU0574, December 3, 2017.
+
+### Appendix I: Forecast Plots
+
+Plot of the hybrid model forecast over a six-month horizon:
+```{}
+plot(fitHmodFuture, xlab = "Years", ylab='%', main = 'Labour Force Participation Rate Forecast with Hybrid')
+```
+
+
+Plot of the hybrid forecast against testing data:
+
+```{r}
+plot(fithmod, xlab = "Years", ylab ='%', main = 'Hybrid Forecast of Labour Force Participation Rates', PI = FALSE)
+lines(testLbr)
+```
+
+Plot of the hybrid forecast compared with other high performing forecasts:
+
+```{r}
+plot(fithmod, xlab = "Years", ylab ='%', main = 'Labour Force Participation Rate Forecasts', PI = FALSE)
+lines(testLbr)
+lines(fithw_m_d$mean, col = 'yellow')
+lines(fitnet$mean, col = 'purple')
+lines(fitses$mean, col = 'red')
+legend('topleft', lty =1, col =c('Blue','Yellow','Purple', 'Red'), 
+       legend = c('Hybrid', 'HW Damped', 'Neural Network', 'SES'))
+```
+
+### Appendix II: Residual Plots (Vector Autoregression)
+
+```{r}
+#Check residuals:
+acf(residuals(varTrain.1))
+acf(residuals(varTrain.1), type="partial", lag.max=10)
+```
+
+### Appendix III: Impulse Response Function Plots
+
+
+```{r}
+#Impules response
+plot( irf(varTrain.1, response = "LbrForce", n.ahead = 36, boot = TRUE) , plot.type = "single")
+```
+
+### Appendix IV: Factor Error Variance Decompositions 
+
+```{r}
+varFevd = fevd(varTrain.1, n.ahead = 36)
+varFevd$LbrForce
+```
